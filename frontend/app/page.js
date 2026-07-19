@@ -7,6 +7,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 Chart.register(...registerables);
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 const htmlContent = `
 <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center gap-3">
@@ -49,6 +50,8 @@ const htmlContent = `
             <div id="alertDropdownList" class="overflow-y-auto p-2 space-y-1.5"></div>
           </div>
         </div>
+
+        <button id="authBtn" class="flex items-center gap-1.5 border border-line rounded-xl px-3 h-10 text-sm bg-white hover:border-teal-400 transition">Masuk</button>
 
         <button id="quickAddBtn" class="flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 transition text-white rounded-xl px-3.5 h-10 text-sm font-semibold">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -338,6 +341,28 @@ const htmlContent = `
   </div>
 </div>
 
+<!-- ============ LOGIN MODAL ============ -->
+<div id="loginModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-end md:items-center justify-center">
+  <form id="loginForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-80 p-5 space-y-3.5">
+    <div class="flex items-center justify-between">
+      <h3 class="font-display font-bold text-[15px]">Masuk ke CashMoney</h3>
+      <button type="button" id="loginClose" class="modal-close text-inksoft text-xl leading-none">&times;</button>
+    </div>
+    <div>
+      <label class="text-[12.5px] font-medium text-inksoft">Email</label>
+      <input id="login_email" type="email" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div>
+      <label class="text-[12.5px] font-medium text-inksoft">Password</label>
+      <input id="login_password" type="password" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div class="flex gap-2 pt-1">
+      <button type="button" id="loginCancel" class="text-inksoft text-sm font-medium px-4 h-11 rounded-xl border border-line">Batal</button>
+      <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Masuk</button>
+    </div>
+  </form>
+</div>
+
 <!-- ============ EXPENSE FORM MODAL ============ -->
 <div id="expenseModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
   <form id="expenseForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
@@ -390,9 +415,14 @@ const htmlContent = `
         </label>
       </div>
     </div>
+    </div>
     <div>
       <label class="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
       <input id="exp_note" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="mis. bayar via transfer BCA" />
+    </div>
+    <div>
+      <label class="text-[12.5px] font-medium text-inksoft">Lampiran bukti (opsional)</label>
+      <input id="exp_attachment" type="file" accept="image/*,application/pdf" class="w-full mt-1" />
     </div>
     <div class="flex gap-2 pt-1">
       <button type="button" id="exp_delete" class="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
@@ -435,6 +465,10 @@ const htmlContent = `
     <div>
       <label class="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
       <input id="inc_note" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div>
+      <label class="text-[12.5px] font-medium text-inksoft">Lampiran bukti (opsional)</label>
+      <input id="inc_attachment" type="file" accept="image/*,application/pdf" class="w-full mt-1" />
     </div>
     <div class="flex gap-2 pt-1">
       <button type="button" id="inc_delete" class="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
@@ -600,6 +634,66 @@ export default function Home({ initialView = 'dashboard' }) {
       cadangan: { label: 'Dana Cadangan / Likuiditas', color: '#B8471F', subs: ['Dana Liburan', 'Dana Perayaan', 'Cadangan Lainnya'] },
     };
 
+    const expenseToBackend = (item) => ({
+      category: item.category,
+      subcategory: item.subcategory,
+      frequency: item.freq,
+      amount: item.amount,
+      date: item.date,
+      status: item.status,
+      is_estimate: !!item.isEstimate,
+      note: item.note,
+    });
+
+    const expenseFromBackend = (item) => ({
+      id: String(item.id),
+      category: item.category,
+      subcategory: item.subcategory,
+      freq: item.frequency || '',
+      amount: Number(item.amount),
+      date: item.date,
+      status: item.status,
+      isEstimate: !!item.is_estimate,
+      note: item.note || '',
+      createdAt: item.created_at ? Date.parse(item.created_at) : Date.now(),
+    });
+
+    const incomeToBackend = (item) => ({
+      category: item.category,
+      subcategory: item.subcategory,
+      amount: item.amount,
+      date: item.date,
+      note: item.note,
+    });
+
+    const incomeFromBackend = (item) => ({
+      id: String(item.id),
+      category: item.category,
+      subcategory: item.subcategory,
+      amount: Number(item.amount),
+      date: item.date,
+      note: item.note || '',
+      createdAt: item.created_at ? Date.parse(item.created_at) : Date.now(),
+    });
+
+    const allocationToBackend = (item) => ({
+      category: item.category,
+      subcategory: item.subcategory,
+      amount: item.amount,
+      date: item.date,
+      note: item.note,
+    });
+
+    const allocationFromBackend = (item) => ({
+      id: String(item.id),
+      category: item.category,
+      subcategory: item.subcategory,
+      amount: Number(item.amount),
+      date: item.date,
+      note: item.note || '',
+      createdAt: item.created_at ? Date.parse(item.created_at) : Date.now(),
+    });
+
     class Store {
       constructor() {
         this.hasWidgetStorage = typeof window !== 'undefined' && !!window.storage;
@@ -651,37 +745,130 @@ export default function Home({ initialView = 'dashboard' }) {
     }
 
     class Repo {
-      constructor(store, key) {
+      constructor(store, key, endpoint = null, toBackend = (item) => item, fromBackend = (item) => item) {
         this.store = store;
         this.key = key;
+        this.endpoint = endpoint;
+        this.toBackend = toBackend;
+        this.fromBackend = fromBackend;
         this.items = [];
       }
+
+      async apiRequest(method, path = '', body = null) {
+        const token = await this.store.get('cashmoney:token');
+        if (!token || !this.endpoint) {
+          throw new Error('No API token or endpoint available');
+        }
+
+        const headers = {
+          'Accept': 'application/json',
+        };
+
+        // Authorization header
+        headers.Authorization = `Bearer ${token}`;
+
+        const options = { method, headers };
+
+        // If body is FormData, send it as-is (do not set Content-Type)
+        if (body instanceof FormData) {
+          options.body = body;
+        } else if (body) {
+          headers['Content-Type'] = 'application/json';
+          options.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(`${API_BASE}/${path}`, options);
+
+        const json = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message = json?.message || json?.error || response.statusText;
+          throw new Error(message);
+        }
+
+        return json;
+      }
+
       async load() {
+        try {
+          const json = await this.apiRequest('GET', this.endpoint);
+          const payload = json?.data ?? json;
+          if (Array.isArray(payload)) {
+            this.items = payload.map(this.fromBackend);
+            await this.persist();
+            return this.items;
+          }
+        } catch (error) {
+          console.warn('Backend load failed, using local cache:', error);
+        }
+
         const raw = await this.store.get(this.key);
         this.items = raw ? JSON.parse(raw) : [];
         return this.items;
       }
+
       async persist() {
         await this.store.set(this.key, JSON.stringify(this.items));
       }
+
       async add(item) {
-        this.items.push(item);
-        await this.persist();
-      }
-      async update(id, patch) {
-        const i = this.items.findIndex((x) => x.id === id);
-        if (i > -1) {
-          this.items[i] = { ...this.items[i], ...patch };
+        if (this.items.find((x) => x.id === item.id)) {
+          return this.update(item.id, item);
+        }
+
+        try {
+          const response = await this.apiRequest('POST', this.endpoint, this.toBackend(item));
+          const returned = response?.data ?? response;
+          const created = this.fromBackend(returned);
+          this.items.push(created);
           await this.persist();
+          return created;
+        } catch (error) {
+          console.warn('Backend add failed, saving locally:', error);
+          this.items.push(item);
+          await this.persist();
+          return item;
         }
       }
+
+      async update(id, patch) {
+        const index = this.items.findIndex((x) => x.id === id);
+        if (index === -1) {
+          return;
+        }
+
+        const existing = this.items[index];
+        const updatedItem = { ...existing, ...patch };
+
+        try {
+          const response = await this.apiRequest('PUT', `${this.endpoint}/${id}`, this.toBackend(updatedItem));
+          const returned = response?.data ?? response;
+          const converted = this.fromBackend(returned);
+          this.items[index] = converted;
+          await this.persist();
+          return converted;
+        } catch (error) {
+          console.warn('Backend update failed, updating locally:', error);
+          this.items[index] = updatedItem;
+          await this.persist();
+          return updatedItem;
+        }
+      }
+
       async remove(id) {
+        try {
+          await this.apiRequest('DELETE', `${this.endpoint}/${id}`);
+        } catch (error) {
+          console.warn('Backend delete failed, removing locally:', error);
+        }
+
         this.items = this.items.filter((x) => x.id !== id);
         await this.persist();
       }
+
       find(id) {
         return this.items.find((x) => x.id === id);
       }
+
       inRange(start, end) {
         return this.items.filter((x) => x.date >= start && x.date <= end);
       }
@@ -734,14 +921,15 @@ export default function Home({ initialView = 'dashboard' }) {
     class App {
       constructor(initialView = 'dashboard') {
         this.store = new Store();
-        this.expenses = new Repo(this.store, 'cashmoney:expenses');
-        this.incomes = new Repo(this.store, 'cashmoney:incomes');
-        this.allocations = new Repo(this.store, 'cashmoney:allocations');
+        this.expenses = new Repo(this.store, 'cashmoney:expenses', 'expenses', expenseToBackend, expenseFromBackend);
+        this.incomes = new Repo(this.store, 'cashmoney:incomes', 'incomes', incomeToBackend, incomeFromBackend);
+        this.allocations = new Repo(this.store, 'cashmoney:allocations', 'allocations', allocationToBackend, allocationFromBackend);
         this.expenseFilter = 'all';
         this.incomeFilter = 'all';
         this.charts = {};
         this.confirmCb = null;
         this.initialView = initialView;
+        this.tokenKey = 'cashmoney:token';
         const today = new Date();
         const first = new Date(today.getFullYear(), today.getMonth(), 1);
         this.range = { start: U.iso(first), end: U.iso(today) };
@@ -752,6 +940,11 @@ export default function Home({ initialView = 'dashboard' }) {
         this.bindRangePicker();
         this.switchView(this.initialView);
         this.renderAll();
+
+        this.token = await this.store.get(this.tokenKey);
+        if (!this.token) {
+          toast('Token API backend tidak ditemukan. Simpan token Laravel di localStorage key cashmoney:token untuk sinkronisasi.', 'err');
+        }
 
         const fallbackCleanup = setTimeout(() => {
           this.hideLoading();
@@ -850,6 +1043,11 @@ export default function Home({ initialView = 'dashboard' }) {
         document.getElementById('rangeBtn')?.addEventListener('click', () => this.fp.open());
       }
       bindModals() {
+        // auth bindings
+        document.getElementById('authBtn')?.addEventListener('click', () => this.openModal('loginModal'));
+        document.getElementById('loginCancel')?.addEventListener('click', () => this.closeModal('loginModal'));
+        document.getElementById('loginForm')?.addEventListener('submit', (e) => this.loginSubmit(e));
+
         document.getElementById('quickAddBtn')?.addEventListener('click', () => this.openModal('quickAddModal'));
         document.getElementById('quickAddCancel')?.addEventListener('click', () => this.closeModal('quickAddModal'));
         document.querySelectorAll('[data-add]').forEach((btn) => btn.addEventListener('click', () => {
@@ -892,6 +1090,44 @@ export default function Home({ initialView = 'dashboard' }) {
           this.closeModal('confirmModal');
         });
         document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPdf());
+      }
+      async loginSubmit(e) {
+        e.preventDefault();
+        const email = document.getElementById('login_email')?.value;
+        const password = document.getElementById('login_password')?.value;
+        if (!email || !password) return toast('Email dan password wajib', 'err');
+
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const json = await res.json();
+          if (!res.ok) {
+            throw new Error(json?.message || json?.error || 'Login gagal');
+          }
+
+          const token = json?.token;
+          if (!token) throw new Error('Token tidak diterima');
+
+          await this.store.set(this.tokenKey, token);
+          this.token = token;
+          toast('Login berhasil');
+          this.closeModal('loginModal');
+
+          // reload backend data
+          try {
+            await Promise.all([this.expenses.load(), this.incomes.load(), this.allocations.load()]);
+            this.renderAll();
+          } catch (err) {
+            console.warn('Load after login failed', err);
+          }
+        } catch (err) {
+          console.error(err);
+          toast(err.message || 'Login gagal', 'err');
+        }
       }
       openModal(id) {
         const el = document.getElementById(id);
@@ -1010,7 +1246,47 @@ export default function Home({ initialView = 'dashboard' }) {
           note: document.getElementById('exp_note').value,
           createdAt: Date.now(),
         };
-        if (this.expenses.find(id)) await this.expenses.update(id, data); else await this.expenses.add(data);
+
+        const fileInput = document.getElementById('exp_attachment');
+        const file = fileInput?.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+        if (file) {
+          // build FormData and send directly so file is uploaded
+          const fd = new FormData();
+          fd.append('category', data.category);
+          fd.append('subcategory', data.subcategory);
+          fd.append('frequency', data.freq);
+          fd.append('amount', String(data.amount));
+          fd.append('date', data.date);
+          fd.append('status', data.status);
+          fd.append('is_estimate', data.isEstimate ? '1' : '0');
+          fd.append('note', data.note || '');
+          fd.append('attachment', file);
+
+          try {
+            if (this.expenses.find(id)) {
+              // Laravel expects PUT for update; use method override
+              fd.append('_method', 'PUT');
+              const resp = await this.expenses.apiRequest('POST', `${this.expenses.endpoint}/${id}`, fd);
+              const returned = resp?.data ?? resp;
+              const converted = this.expenses.fromBackend(returned);
+              const idx = this.expenses.items.findIndex((x) => x.id === id);
+              if (idx !== -1) this.expenses.items[idx] = converted; else this.expenses.items.push(converted);
+              await this.expenses.persist();
+            } else {
+              const resp = await this.expenses.apiRequest('POST', this.expenses.endpoint, fd);
+              const returned = resp?.data ?? resp;
+              const created = this.expenses.fromBackend(returned);
+              this.expenses.items.push(created);
+              await this.expenses.persist();
+            }
+          } catch (err) {
+            console.warn('Upload failed, falling back to local save', err);
+            if (this.expenses.find(id)) await this.expenses.update(id, data); else await this.expenses.add(data);
+          }
+        } else {
+          if (this.expenses.find(id)) await this.expenses.update(id, data); else await this.expenses.add(data);
+        }
         this.closeModal('expenseModal');
         this.renderAll();
         toast('Pengeluaran tersimpan');
@@ -1028,7 +1304,42 @@ export default function Home({ initialView = 'dashboard' }) {
           note: document.getElementById('inc_note').value,
           createdAt: Date.now(),
         };
-        if (this.incomes.find(id)) await this.incomes.update(id, data); else await this.incomes.add(data);
+
+        const fileInput = document.getElementById('inc_attachment');
+        const file = fileInput?.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+        if (file) {
+          const fd = new FormData();
+          fd.append('category', data.category);
+          fd.append('subcategory', data.subcategory);
+          fd.append('amount', String(data.amount));
+          fd.append('date', data.date);
+          fd.append('note', data.note || '');
+          fd.append('attachment', file);
+
+          try {
+            if (this.incomes.find(id)) {
+              fd.append('_method', 'PUT');
+              const resp = await this.incomes.apiRequest('POST', `${this.incomes.endpoint}/${id}`, fd);
+              const returned = resp?.data ?? resp;
+              const converted = this.incomes.fromBackend(returned);
+              const idx = this.incomes.items.findIndex((x) => x.id === id);
+              if (idx !== -1) this.incomes.items[idx] = converted; else this.incomes.items.push(converted);
+              await this.incomes.persist();
+            } else {
+              const resp = await this.incomes.apiRequest('POST', this.incomes.endpoint, fd);
+              const returned = resp?.data ?? resp;
+              const created = this.incomes.fromBackend(returned);
+              this.incomes.items.push(created);
+              await this.incomes.persist();
+            }
+          } catch (err) {
+            console.warn('Upload failed, falling back to local save', err);
+            if (this.incomes.find(id)) await this.incomes.update(id, data); else await this.incomes.add(data);
+          }
+        } else {
+          if (this.incomes.find(id)) await this.incomes.update(id, data); else await this.incomes.add(data);
+        }
         this.closeModal('incomeModal');
         this.renderAll();
         toast('Pemasukan tersimpan');
