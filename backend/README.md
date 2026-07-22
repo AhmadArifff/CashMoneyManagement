@@ -53,6 +53,67 @@ In order to ensure that the Laravel community is welcoming to all, please review
 
 If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
 
-## License
+## Supabase Setup & Configuration
+
+Backend CashMoneyManagement dikonfigurasi untuk terhubung dengan **Supabase PostgreSQL** dan mengelola penyimpanan bukti pengeluaran (gambar JPG/PNG/WEBP atau PDF).
+
+### 1. Konfigurasi Database Supabase (`.env`)
+
+Pastikan file `.env` memiliki variabel berikut (ganti `YOUR_SUPABASE_PASSWORD` dengan password database Supabase milikmu):
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=aws-0-ap-southeast-1.pooler.supabase.com
+DB_PORT=6543
+DB_DATABASE=postgres
+DB_USERNAME=postgres.vcwowbvufxhokeefrcdk
+DB_PASSWORD=YOUR_SUPABASE_PASSWORD
+DB_SSLMODE=require
+```
+
+> **Persyaratan PHP CLI:** Pastikan ekstensi `pdo_pgsql` dan `pgsql` telah diaktifkan di `php.ini` environment PHP lokal milikmu.
+
+### 2. Jalankan Migrasi & Seeding Database
+
+Untuk membuat seluruh tabel dan seeding data sampel awal pada database Supabase:
+
+```bash
+# Menjalankan migrasi database ke Supabase
+php artisan migrate
+
+# Menjalankan seeder sampel data (User, Profile, Expenses, Incomes, Allocations)
+php artisan db:seed
+
+# Atau jalankan migrasi fresh + seed sekaligus:
+php artisan migrate:fresh --seed
+```
+
+### 3. Konfigurasi Storage (Bukti Pengeluaran / Receipts)
+
+Backend mendukung penyimpanan file gambar (`jpg`, `jpeg`, `png`, `webp`) dan dokumen (`pdf`) hingga **10MB** per file.
+
+#### A. Penyimpanan Lokal (Default)
+Untuk menggunakan penyimpanan lokal via `storage/app/public/receipts`:
+```bash
+php artisan storage:link
+```
+File akan dapat diakses publik di path `/storage/receipts/...`.
+
+#### B. Penyimpanan Cloud (Supabase S3 Storage)
+Jika ingin mengaktifkan Supabase Cloud S3 Storage, isi variabel berikut di `.env`:
+```env
+FILESYSTEM_DISK=supabase
+SUPABASE_URL=https://vcwowbvufxhokeefrcdk.supabase.co
+SUPABASE_STORAGE_BUCKET=receipts
+SUPABASE_STORAGE_KEY=your_supabase_s3_access_key
+SUPABASE_STORAGE_SECRET=your_supabase_s3_secret_key
+SUPABASE_STORAGE_REGION=ap-southeast-1
+```
+Jika menggunakan `FILESYSTEM_DISK=supabase`, install paket AWS S3 Flysystem adapter:
+```bash
+composer require league/flysystem-aws-s3-v3
+```
+
+---
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

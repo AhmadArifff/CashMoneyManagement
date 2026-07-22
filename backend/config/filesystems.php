@@ -60,6 +60,28 @@ return [
             'report' => false,
         ],
 
+        'supabase' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_STORAGE_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('SUPABASE_STORAGE_SECRET', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('SUPABASE_STORAGE_REGION', env('AWS_DEFAULT_REGION', 'ap-southeast-1')),
+            'bucket' => env('SUPABASE_STORAGE_BUCKET', 'receipts'),
+            'url' => env('SUPABASE_STORAGE_URL'),
+            'endpoint' => env('SUPABASE_STORAGE_ENDPOINT', env('SUPABASE_URL', 'https://vcwowbvufxhokeefrcdk.supabase.co').'/storage/v1/s3'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'receipts' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/receipts'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage/receipts',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
