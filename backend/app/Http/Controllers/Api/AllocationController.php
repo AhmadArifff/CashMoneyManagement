@@ -7,6 +7,7 @@ use App\Http\Requests\StoreAllocationRequest;
 use App\Http\Resources\AllocationResource;
 use App\Services\AllocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AllocationController extends Controller
 {
@@ -27,14 +28,24 @@ class AllocationController extends Controller
 
     public function store(StoreAllocationRequest $request)
     {
-        $allocation = $this->allocationService->store($request->user()->id, $request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('attachment')) {
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
+        }
+
+        $allocation = $this->allocationService->store($request->user()->id, $data);
 
         return (new AllocationResource($allocation))->response()->setStatusCode(201);
     }
 
     public function update(StoreAllocationRequest $request, int $id)
     {
-        $allocation = $this->allocationService->update($request->user()->id, $id, $request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('attachment')) {
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
+        }
+
+        $allocation = $this->allocationService->update($request->user()->id, $id, $data);
 
         return new AllocationResource($allocation);
     }

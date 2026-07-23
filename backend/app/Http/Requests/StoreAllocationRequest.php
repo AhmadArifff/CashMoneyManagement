@@ -19,6 +19,7 @@ class StoreAllocationRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0'],
             'date' => ['required', 'date'],
             'note' => ['nullable', 'string'],
+            'attachment' => ['nullable', 'file', 'mimes:jpeg,png,jpg,webp,pdf', 'max:10240'],
         ];
     }
 }

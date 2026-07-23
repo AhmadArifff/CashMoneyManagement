@@ -30,8 +30,7 @@ class IncomeController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            $disk = config('filesystems.default', 'public');
-            $data['attachment_path'] = $request->file('attachment')->store('receipts', $disk);
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
         }
 
         $income = $this->incomeService->store($request->user()->id, $data);
@@ -44,8 +43,7 @@ class IncomeController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            $disk = config('filesystems.default', 'public');
-            $data['attachment_path'] = $request->file('attachment')->store('receipts', $disk);
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
         }
 
         $income = $this->incomeService->update($request->user()->id, $id, $data);

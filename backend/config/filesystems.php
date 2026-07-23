@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    'default' => env('FILESYSTEM_DISK', env('SUPABASE_STORAGE_KEY') && env('SUPABASE_STORAGE_SECRET') ? 'supabase' : 'local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -66,8 +66,8 @@ return [
             'secret' => env('SUPABASE_STORAGE_SECRET', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('SUPABASE_STORAGE_REGION', env('AWS_DEFAULT_REGION', 'ap-southeast-1')),
             'bucket' => env('SUPABASE_STORAGE_BUCKET', 'receipts'),
-            'url' => env('SUPABASE_STORAGE_URL'),
-            'endpoint' => env('SUPABASE_STORAGE_ENDPOINT', env('SUPABASE_URL', 'https://vcwowbvufxhokeefrcdk.supabase.co').'/storage/v1/s3'),
+            'url' => env('SUPABASE_STORAGE_URL', rtrim(env('SUPABASE_URL', 'https://vcwowbvufxhokeefrcdk.supabase.co'), '/').'/storage/v1/s3'),
+            'endpoint' => env('SUPABASE_STORAGE_ENDPOINT', rtrim(env('SUPABASE_URL', 'https://vcwowbvufxhokeefrcdk.supabase.co'), '/').'/storage/v1/s3'),
             'use_path_style_endpoint' => true,
             'throw' => false,
             'report' => false,

@@ -30,8 +30,7 @@ class ExpenseController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            $disk = config('filesystems.default', 'public');
-            $data['attachment_path'] = $request->file('attachment')->store('receipts', $disk);
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
         }
 
         $expense = $this->expenseService->store($request->user()->id, $data);
@@ -44,8 +43,7 @@ class ExpenseController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            $disk = config('filesystems.default', 'public');
-            $data['attachment_path'] = $request->file('attachment')->store('receipts', $disk);
+            $data['attachment_path'] = $request->file('attachment')->store('receipts', 'supabase');
         }
 
         return new ExpenseResource($this->expenseService->update($request->user()->id, $id, $data));

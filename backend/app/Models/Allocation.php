@@ -13,6 +13,7 @@ class Allocation extends Model
         'amount',
         'date',
         'note',
+        'attachment_path',
     ];
 
     protected $casts = [

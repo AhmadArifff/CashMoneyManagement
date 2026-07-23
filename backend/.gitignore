@@ -3,6 +3,7 @@
 .env
 .env.backup
 .env.production
+.env.*
 .phpactor.json
 .phpunit.result.cache
 /.codex
@@ -20,6 +21,11 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/public
+/storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
 /vendor
 _ide_helper.php
 Homestead.json
