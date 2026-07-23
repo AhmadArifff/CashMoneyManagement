@@ -9,532 +9,6 @@ import { jsPDF } from 'jspdf';
 Chart.register(...registerables);
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-const htmlContent = `
-<div id="loadingOverlay" class="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center gap-3">
-  <div class="w-10 h-10 border-[3px] border-teal-200 border-t-teal-700 rounded-full animate-spin"></div>
-  <p class="text-sm text-inksoft font-medium">Memuat data kamu...</p>
-</div>
-
-<div id="app" class="min-h-screen">
-
-  <!-- ============ TOP BAR ============ -->
-  <header class="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-line">
-    <div class="flex items-center justify-between gap-3 px-4 md:px-6 h-16">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-teal-700 flex items-center justify-center shrink-0">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div class="hidden sm:block leading-tight">
-          <p class="font-display font-bold text-[15px] text-ink">CashMoneyManagement</p>
-          <p class="text-[11px] text-inksoft -mt-0.5">Cashflow harian → mingguan → bulanan</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button id="rangeBtn" class="flex items-center gap-2 border border-line rounded-xl px-3 h-10 text-sm bg-white hover:border-teal-400 transition">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16594A" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-          <span id="rangeLabel" class="font-mono text-[12.5px] text-ink whitespace-nowrap"></span>
-        </button>
-        <input id="rangeInput" class="hidden" />
-
-        <div class="relative">
-          <button id="alertBell" class="relative w-10 h-10 rounded-xl border border-line bg-white flex items-center justify-center hover:border-amber-400 transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4B5A55" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-            <span id="alertDot" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rust-500 text-white text-[10px] font-bold items-center justify-center">0</span>
-          </button>
-          <div id="alertDropdown" class="hidden absolute right-0 top-[calc(100%+8px)] w-80 max-w-[88vw] bg-white rounded-2xl border border-line shadow-lg z-40 max-h-[70vh] overflow-hidden flex flex-col">
-            <div class="px-4 py-3 border-b border-line flex items-center justify-between shrink-0">
-              <p class="font-display font-semibold text-[13.5px]">Tagihan Belum Dibayar</p>
-              <span id="alertDropdownCount" class="text-[11px] font-semibold bg-rust-50 text-rust-600 rounded-full px-2 py-0.5">0</span>
-            </div>
-            <div id="alertDropdownList" class="overflow-y-auto p-2 space-y-1.5"></div>
-          </div>
-        </div>
-
-        <button id="authBtn" class="flex items-center gap-1.5 border border-line rounded-xl px-3 h-10 text-sm bg-white hover:border-teal-400 transition">Masuk</button>
-
-        <button id="quickAddBtn" class="flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 transition text-white rounded-xl px-3.5 h-10 text-sm font-semibold">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          <span class="hidden sm:inline">Tambah</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- alert banner -->
-    <div id="alertBanner" class="hidden border-t border-amber-200 bg-amber-50 px-4 md:px-6 py-2 text-[13px] text-amber-700 flex items-center gap-2 cursor-pointer">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B87511" stroke-width="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-      <span id="alertBannerText"></span>
-      <span class="ml-auto underline font-medium shrink-0">Lihat detail</span>
-    </div>
-  </header>
-
-  <div class="flex">
-    <!-- ============ SIDEBAR (desktop) ============ -->
-    <nav class="hidden md:flex flex-col w-60 shrink-0 border-r border-line bg-white min-h-[calc(100vh-64px)] px-3 py-5 gap-1">
-      <a href="/dashboard" data-view="dashboard" class="nav-link active flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        Dashboard
-      </a>
-      <a href="/expenses" data-view="expenses" class="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" stroke-width="2"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
-        Pengeluaran
-      </a>
-      <a href="/incomes" data-view="incomes" class="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-        Pemasukan
-      </a>
-      <a href="/allocations" data-view="allocations" class="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 7"/></svg>
-        Dana Alokasi
-      </a>
-      <a href="/reports" data-view="reports" class="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" stroke-width="2"><path d="M8 17V9M13 17V5M18 17v-5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        Laporan
-      </a>
-
-      <div class="mt-auto pt-4 border-t border-line">
-        <p class="text-[11px] text-inksoft px-3.5 leading-relaxed">Data tersimpan otomatis untuk sesi Claude ini.</p>
-      </div>
-    </nav>
-
-    <!-- ============ MAIN ============ -->
-    <main class="flex-1 min-w-0 px-4 md:px-6 py-5 pb-28 md:pb-8">
-
-      <!-- ---------- DASHBOARD ---------- -->
-      <section id="view-dashboard" class="view active space-y-5">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="font-display text-xl font-bold text-ink">Dashboard</h1>
-            <p id="dashPeriodLabel" class="text-[13px] text-inksoft"></p>
-          </div>
-        </div>
-
-        <!-- summary cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div class="bg-surface rounded-2xl shadow-card border border-line p-4">
-            <p class="text-[12px] text-inksoft font-medium">Pemasukan</p>
-            <p id="sumIncome" class="font-mono font-bold text-lg text-teal-700 mt-1">Rp 0</p>
-          </div>
-          <div class="bg-surface rounded-2xl shadow-card border border-line p-4">
-            <p class="text-[12px] text-inksoft font-medium">Pengeluaran</p>
-            <p id="sumExpense" class="font-mono font-bold text-lg text-rust-600 mt-1">Rp 0</p>
-          </div>
-          <div class="bg-surface rounded-2xl shadow-card border border-line p-4">
-            <p class="text-[12px] text-inksoft font-medium">Alokasi Dana</p>
-            <p id="sumAllocation" class="font-mono font-bold text-lg text-amber-600 mt-1">Rp 0</p>
-          </div>
-          <div id="sumBalanceCard" class="rounded-2xl shadow-card border p-4 bg-teal-700 border-teal-700">
-            <p class="text-[12px] text-teal-100 font-medium flex items-center gap-1">Saldo Bersih <span id="balanceBadge" class="text-[10px] bg-white/20 rounded-full px-1.5 py-0.5">SURPLUS</span></p>
-            <p id="sumBalance" class="font-mono font-bold text-lg text-white mt-1">Rp 0</p>
-          </div>
-        </div>
-
-        <!-- cascade -->
-        <div class="bg-surface rounded-2xl shadow-card border border-line p-4 md:p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2 class="font-display font-semibold text-[15px]">Alur Pengeluaran: Harian → Mingguan → Bulanan</h2>
-              <p class="text-[12px] text-inksoft">Total harian dijumlah tiap hari Minggu (mingguan), lalu tiap minggu terakhir bulan dijumlah jadi total bulanan.</p>
-            </div>
-          </div>
-          <div id="cascadeWrap" class="overflow-x-auto pb-1"></div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="bg-surface rounded-2xl shadow-card border border-line p-4 lg:col-span-2">
-            <h2 class="font-display font-semibold text-[15px] mb-3">Tren Cashflow Mingguan</h2>
-            <div class="h-64"><canvas id="chartTrend"></canvas></div>
-          </div>
-          <div class="bg-surface rounded-2xl shadow-card border border-line p-4">
-            <h2 class="font-display font-semibold text-[15px] mb-3">Komposisi Pengeluaran</h2>
-            <div class="h-64"><canvas id="chartExpenseDonut"></canvas></div>
-          </div>
-        </div>
-
-        <!-- unpaid bills -->
-        <div class="bg-surface rounded-2xl shadow-card border border-line p-4">
-          <h2 class="font-display font-semibold text-[15px] mb-3 flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B87511" stroke-width="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-            Tagihan Belum Terbayar
-          </h2>
-          <div id="unpaidList" class="space-y-2"></div>
-        </div>
-      </section>
-
-      <!-- ---------- EXPENSES ---------- -->
-      <section id="view-expenses" class="view space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 class="font-display text-xl font-bold text-ink">Pengeluaran</h1>
-            <p class="text-[13px] text-inksoft">Tetap, Berkala, dan Dinamis / Variabel</p>
-          </div>
-          <button data-add="expense" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Pengeluaran</button>
-        </div>
-
-        <div class="flex flex-wrap gap-2" id="expenseCatTabs">
-          <button data-cat="all" class="tab-pill active px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Semua</button>
-          <button data-cat="tetap" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Tetap</button>
-          <button data-cat="berkala" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Berkala</button>
-          <button data-cat="dinamis" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Dinamis / Variabel</button>
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-          <div class="bg-surface rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Tetap</p><p id="totTetap" class="font-mono font-bold text-teal-700">Rp 0</p></div>
-          <div class="bg-surface rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Berkala</p><p id="totBerkala" class="font-mono font-bold text-amber-600">Rp 0</p></div>
-          <div class="bg-surface rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Dinamis</p><p id="totDinamis" class="font-mono font-bold text-rust-600">Rp 0</p></div>
-        </div>
-
-        <div id="expenseList" class="space-y-2"></div>
-      </section>
-
-      <!-- ---------- INCOMES ---------- -->
-      <section id="view-incomes" class="view space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 class="font-display text-xl font-bold text-ink">Pemasukan</h1>
-            <p class="text-[13px] text-inksoft">Earned, Passive, dan Portfolio/Investment Income</p>
-          </div>
-          <button data-add="income" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Pemasukan</button>
-        </div>
-
-        <div class="flex flex-wrap gap-2" id="incomeCatTabs">
-          <button data-cat="all" class="tab-pill active px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Semua</button>
-          <button data-cat="earned" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Earned / Active</button>
-          <button data-cat="passive" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Passive</button>
-          <button data-cat="portfolio" class="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Portfolio / Investment</button>
-        </div>
-
-        <div id="incomeList" class="space-y-2"></div>
-      </section>
-
-      <!-- ---------- ALLOCATIONS ---------- -->
-      <section id="view-allocations" class="view space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 class="font-display text-xl font-bold text-ink">Dana Alokasi</h1>
-            <p class="text-[13px] text-inksoft">Darurat, Asuransi, Investasi, dan Cadangan/Likuiditas</p>
-          </div>
-          <button data-add="allocation" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Alokasi</button>
-        </div>
-
-        <div id="allocationCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
-        <div id="allocationList" class="space-y-2"></div>
-      </section>
-
-      <!-- ---------- REPORTS ---------- -->
-      <section id="view-reports" class="view space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 class="font-display text-xl font-bold text-ink">Laporan</h1>
-            <p class="text-[13px] text-inksoft">Ringkasan interaktif untuk periode yang dipilih — bisa diekspor ke PDF.</p>
-          </div>
-          <button id="exportPdfBtn" class="flex items-center gap-2 bg-rust-500 hover:bg-rust-600 text-white text-sm font-semibold rounded-xl px-4 h-10">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-            Export PDF
-          </button>
-        </div>
-
-        <div id="reportContent" class="bg-surface rounded-2xl shadow-card border border-line p-5 md:p-7 space-y-6">
-          <div class="flex items-center justify-between border-b border-line pb-4">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-xl bg-teal-700 flex items-center justify-center shrink-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              </div>
-              <div>
-                <p class="font-display font-bold text-ink">CashMoneyManagement</p>
-                <p class="text-[12px] text-inksoft">Laporan Keuangan Pribadi</p>
-              </div>
-            </div>
-            <p id="reportPeriod" class="font-mono text-[12.5px] text-inksoft text-right"></p>
-          </div>
-
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Total Pemasukan</p><p id="repIncome" class="font-mono font-bold text-teal-700">Rp 0</p></div>
-            <div class="rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Total Pengeluaran</p><p id="repExpense" class="font-mono font-bold text-rust-600">Rp 0</p></div>
-            <div class="rounded-xl border border-line p-3"><p class="text-[11px] text-inksoft">Total Alokasi</p><p id="repAllocation" class="font-mono font-bold text-amber-600">Rp 0</p></div>
-            <div class="rounded-xl border border-line p-3 bg-teal-700"><p class="text-[11px] text-teal-100">Saldo Akhir</p><p id="repBalance" class="font-mono font-bold text-white">Rp 0</p></div>
-          </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div>
-              <h3 class="font-display font-semibold text-[14px] mb-2">Pengeluaran per Kategori</h3>
-              <div class="h-56"><canvas id="chartRepExpense"></canvas></div>
-            </div>
-            <div>
-              <h3 class="font-display font-semibold text-[14px] mb-2">Pemasukan per Kategori</h3>
-              <div class="h-56"><canvas id="chartRepIncome"></canvas></div>
-            </div>
-          </div>
-
-          <div>
-            <h3 class="font-display font-semibold text-[14px] mb-2">Tren Bulanan (6 Bulan Terakhir)</h3>
-            <div class="h-64"><canvas id="chartRepTrend"></canvas></div>
-          </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div>
-              <h3 class="font-display font-semibold text-[14px] mb-2">Rincian Pengeluaran</h3>
-              <table class="w-full text-[12.5px]"><tbody id="repExpenseTable"></tbody></table>
-            </div>
-            <div>
-              <h3 class="font-display font-semibold text-[14px] mb-2">Rincian Pemasukan</h3>
-              <table class="w-full text-[12.5px]"><tbody id="repIncomeTable"></tbody></table>
-            </div>
-            <div>
-              <h3 class="font-display font-semibold text-[14px] mb-2">Rincian Alokasi Dana</h3>
-              <table class="w-full text-[12.5px]"><tbody id="repAllocationTable"></tbody></table>
-            </div>
-          </div>
-
-          <div class="rounded-xl bg-teal-50 border border-teal-100 p-4">
-            <h3 class="font-display font-semibold text-[14px] mb-2 text-teal-800">Ringkasan & Saran</h3>
-            <ul id="repSuggestions" class="space-y-1.5 text-[13px] text-teal-800 list-disc list-inside"></ul>
-          </div>
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- ============ MOBILE BOTTOM NAV ============ -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-line flex items-stretch h-16 px-1">
-    <a href="/dashboard" data-view="dashboard" class="nav-link-mobile active flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-      <span class="text-[10px] font-medium">Dashboard</span>
-    </a>
-    <a href="/expenses" data-view="expenses" class="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
-      <span class="text-[10px] font-medium">Keluar</span>
-    </a>
-    <a href="/incomes" data-view="incomes" class="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-      <span class="text-[10px] font-medium">Masuk</span>
-    </a>
-    <a href="/allocations" data-view="allocations" class="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 7"/></svg>
-      <span class="text-[10px] font-medium">Alokasi</span>
-    </a>
-    <a href="/reports" data-view="reports" class="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 17V9M13 17V5M18 17v-5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-      <span class="text-[10px] font-medium">Laporan</span>
-    </a>
-  </nav>
-</div>
-
-<!-- ============ QUICK ADD CHOOSER ============ -->
-<div id="quickAddModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center">
-  <div class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-80 p-4 space-y-2">
-    <p class="font-display font-semibold text-sm px-1 pb-1">Mau catat apa?</p>
-    <button data-add="expense" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-rust-50 text-left">
-      <span class="w-9 h-9 rounded-lg bg-rust-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8471F" stroke-width="2.3"><path d="M5 12h14"/></svg></span>
-      <span><span class="block text-sm font-semibold">Pengeluaran</span><span class="block text-[12px] text-inksoft">Tetap, berkala, atau dinamis</span></span>
-    </button>
-    <button data-add="income" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-teal-50 text-left">
-      <span class="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F6F5C" stroke-width="2.3"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
-      <span><span class="block text-sm font-semibold">Pemasukan</span><span class="block text-[12px] text-inksoft">Earned, passive, atau investment</span></span>
-    </button>
-    <button data-add="allocation" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-amber-50 text-left">
-      <span class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B87511" stroke-width="2.3"><path d="M12 2v20"/></svg></span>
-      <span><span class="block text-sm font-semibold">Dana Alokasi</span><span class="block text-[12px] text-inksoft">Darurat, asuransi, investasi, cadangan</span></span>
-    </button>
-    <button id="quickAddCancel" class="w-full text-center py-2.5 text-sm font-medium text-inksoft">Batal</button>
-  </div>
-</div>
-
-<!-- ============ LOGIN MODAL ============ -->
-<div id="loginModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-end md:items-center justify-center">
-  <form id="loginForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-80 p-5 space-y-3.5">
-    <div class="flex items-center justify-between">
-      <h3 class="font-display font-bold text-[15px]">Masuk ke CashMoney</h3>
-      <button type="button" id="loginClose" class="modal-close text-inksoft text-xl leading-none">&times;</button>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Email</label>
-      <input id="login_email" type="email" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Password</label>
-      <input id="login_password" type="password" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-    </div>
-    <div class="flex gap-2 pt-1">
-      <button type="button" id="loginCancel" class="text-inksoft text-sm font-medium px-4 h-11 rounded-xl border border-line">Batal</button>
-      <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Masuk</button>
-    </div>
-  </form>
-</div>
-
-<!-- ============ EXPENSE FORM MODAL ============ -->
-<div id="expenseModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
-  <form id="expenseForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
-    <div class="flex items-center justify-between">
-      <h3 class="font-display font-bold text-[15px]">Catat Pengeluaran</h3>
-      <button type="button" class="modal-close text-inksoft text-xl leading-none">&times;</button>
-    </div>
-    <input type="hidden" id="exp_id" />
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Jenis Pengeluaran</label>
-      <select id="exp_category" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
-        <option value="tetap">Tetap (rutin, jumlah konstan)</option>
-        <option value="berkala">Berkala (di luar siklus bulanan)</option>
-        <option value="dinamis">Dinamis / Variabel</option>
-      </select>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Kategori</label>
-        <input id="exp_sub" list="exp_sub_list" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="Pilih / ketik" />
-        <datalist id="exp_sub_list"></datalist>
-      </div>
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Frekuensi</label>
-        <select id="exp_freq" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white"></select>
-      </div>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Jumlah (Rp)</label>
-        <input id="exp_amount" type="number" min="0" step="1" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm font-mono" placeholder="0" />
-      </div>
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Tanggal</label>
-        <input id="exp_date" type="date" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-      </div>
-    </div>
-    <div id="exp_status_wrap" class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Status Bayar</label>
-        <select id="exp_status" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
-          <option value="unpaid">Belum Dibayar</option>
-          <option value="paid">Sudah Dibayar</option>
-        </select>
-      </div>
-      <div class="flex items-end pb-2.5">
-        <label class="flex items-center gap-2 text-[12.5px] text-inksoft">
-          <input id="exp_estimate" type="checkbox" class="w-4 h-4 rounded border-line accent-teal-700" />
-          Ini estimasi (belum aktual)
-        </label>
-      </div>
-    </div>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
-      <input id="exp_note" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="mis. bayar via transfer BCA" />
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Lampiran bukti (opsional)</label>
-      <input id="exp_attachment" type="file" accept="image/*,application/pdf" class="w-full mt-1" />
-    </div>
-    <div class="flex gap-2 pt-1">
-      <button type="button" id="exp_delete" class="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
-      <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Simpan</button>
-    </div>
-  </form>
-</div>
-
-<!-- ============ INCOME FORM MODAL ============ -->
-<div id="incomeModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
-  <form id="incomeForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
-    <div class="flex items-center justify-between">
-      <h3 class="font-display font-bold text-[15px]">Catat Pemasukan</h3>
-      <button type="button" class="modal-close text-inksoft text-xl leading-none">&times;</button>
-    </div>
-    <input type="hidden" id="inc_id" />
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Jenis Pemasukan</label>
-      <select id="inc_category" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
-        <option value="earned">Earned / Active Income</option>
-        <option value="passive">Passive Income</option>
-        <option value="portfolio">Portfolio / Investment Income</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Kategori</label>
-      <input id="inc_sub" list="inc_sub_list" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="Pilih / ketik" />
-      <datalist id="inc_sub_list"></datalist>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Jumlah (Rp)</label>
-        <input id="inc_amount" type="number" min="0" step="1" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm font-mono" placeholder="0" />
-      </div>
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Tanggal</label>
-        <input id="inc_date" type="date" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-      </div>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
-      <input id="inc_note" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Lampiran bukti (opsional)</label>
-      <input id="inc_attachment" type="file" accept="image/*,application/pdf" class="w-full mt-1" />
-    </div>
-    <div class="flex gap-2 pt-1">
-      <button type="button" id="inc_delete" class="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
-      <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Simpan</button>
-    </div>
-  </form>
-</div>
-
-<!-- ============ ALLOCATION FORM MODAL ============ -->
-<div id="allocationModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
-  <form id="allocationForm" class="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
-    <div class="flex items-center justify-between">
-      <h3 class="font-display font-bold text-[15px]">Catat Dana Alokasi</h3>
-      <button type="button" class="modal-close text-inksoft text-xl leading-none">&times;</button>
-    </div>
-    <input type="hidden" id="alc_id" />
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Jenis Alokasi</label>
-      <select id="alc_category" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
-        <option value="darurat">Dana Darurat (Emergency Fund)</option>
-        <option value="asuransi">Asuransi (Insurance)</option>
-        <option value="investasi">Investasi</option>
-        <option value="cadangan">Dana Cadangan / Likuiditas Tambahan</option>
-      </select>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Kategori</label>
-      <input id="alc_sub" list="alc_sub_list" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="Pilih / ketik" />
-      <datalist id="alc_sub_list"></datalist>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Jumlah (Rp)</label>
-        <input id="alc_amount" type="number" min="0" step="1" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm font-mono" placeholder="0" />
-      </div>
-      <div>
-        <label class="text-[12.5px] font-medium text-inksoft">Tanggal</label>
-        <input id="alc_date" type="date" required class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-      </div>
-    </div>
-    <div>
-      <label class="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
-      <input id="alc_note" class="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
-    </div>
-    <div class="flex gap-2 pt-1">
-      <button type="button" id="alc_delete" class="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
-      <button type="submit" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Simpan</button>
-    </div>
-  </form>
-</div>
-
-<!-- ============ CONFIRM DELETE ============ -->
-<div id="confirmModal" class="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-center justify-center">
-  <div class="bg-white rounded-2xl w-[300px] p-5 text-center space-y-3">
-    <p class="text-sm text-ink">Hapus data ini? Tindakan tidak bisa dibatalkan.</p>
-    <div class="flex gap-2">
-      <button id="confirmCancel" class="flex-1 h-10 rounded-xl border border-line text-sm font-medium">Batal</button>
-      <button id="confirmOk" class="flex-1 h-10 rounded-xl bg-rust-600 text-white text-sm font-semibold">Hapus</button>
-    </div>
-  </div>
-</div>
-
-<!-- toast -->
-<div id="toastWrap" class="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 space-y-2"></div>
-`;
-
 export default function Home({ initialView = 'dashboard' }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -543,15 +17,27 @@ export default function Home({ initialView = 'dashboard' }) {
     window.html2canvas = html2canvas;
     window.jspdf = { jsPDF };
 
+    // Unregister semua service worker lama dulu untuk mencegah konflik cache
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service worker registered:', registration.scope);
-        })
-        .catch((error) => {
-          console.warn('Service worker registration failed:', error);
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        const unregisterAll = registrations.map((r) => r.unregister());
+        Promise.all(unregisterAll).then(() => {
+          // Hapus semua cache lama
+          caches.keys().then((keys) => {
+            return Promise.all(keys.map((k) => caches.delete(k)));
+          }).then(() => {
+            // Daftarkan ulang SW versi terbaru
+            navigator.serviceWorker
+              .register('/sw.js')
+              .then((registration) => {
+                console.log('Service worker registered:', registration.scope);
+              })
+              .catch((error) => {
+                console.warn('Service worker registration failed:', error);
+              });
+          });
         });
+      });
     }
 
     const U = {
@@ -564,7 +50,10 @@ export default function Home({ initialView = 'dashboard' }) {
         return `${y}-${m}-${day}`;
       },
       parseD: (s) => {
-        const [y, m, d] = s.split('-').map(Number);
+        if (!s || typeof s !== 'string') return new Date();
+        const parts = s.split('-');
+        if (parts.length < 3) return new Date();
+        const [y, m, d] = parts.map(Number);
         return new Date(y, m - 1, d);
       },
       addDays: (d, n) => {
@@ -655,6 +144,8 @@ export default function Home({ initialView = 'dashboard' }) {
       status: item.status,
       isEstimate: !!item.is_estimate,
       note: item.note || '',
+      attachmentPath: item.attachment_path || '',
+      attachmentUrl: item.attachment_url || '',
       createdAt: item.created_at ? Date.parse(item.created_at) : Date.now(),
     });
 
@@ -673,6 +164,8 @@ export default function Home({ initialView = 'dashboard' }) {
       amount: Number(item.amount),
       date: item.date,
       note: item.note || '',
+      attachmentPath: item.attachment_path || '',
+      attachmentUrl: item.attachment_url || '',
       createdAt: item.created_at ? Date.parse(item.created_at) : Date.now(),
     });
 
@@ -779,6 +272,20 @@ export default function Home({ initialView = 'dashboard' }) {
 
         const response = await fetch(`${API_BASE}/${path}`, options);
 
+        // If unauthorized, clear stored token so App can react and prompt login
+        if (response.status === 401) {
+          try {
+            await this.store.set('cashmoney:token', '');
+          } catch (e) {
+            // ignore
+          }
+          const jsonErr = await response.json().catch(() => null);
+          const msg = jsonErr?.message || 'Unauthorized';
+          const err = new Error(msg);
+          err.code = 'unauthorized';
+          throw err;
+        }
+
         const json = await response.json().catch(() => null);
         if (!response.ok) {
           const message = json?.message || json?.error || response.statusText;
@@ -788,9 +295,14 @@ export default function Home({ initialView = 'dashboard' }) {
         return json;
       }
 
-      async load() {
+      async load(params = null) {
         try {
-          const json = await this.apiRequest('GET', this.endpoint);
+          let url = this.endpoint;
+          if (params) {
+            const query = new URLSearchParams(params).toString();
+            url = `${this.endpoint}?${query}`;
+          }
+          const json = await this.apiRequest('GET', url);
           const payload = json?.data ?? json;
           if (Array.isArray(payload)) {
             this.items = payload.map(this.fromBackend);
@@ -799,10 +311,17 @@ export default function Home({ initialView = 'dashboard' }) {
           }
         } catch (error) {
           console.warn('Backend load failed, using local cache:', error);
+          if (error && error.code === 'unauthorized') {
+            throw error;
+          }
         }
 
         const raw = await this.store.get(this.key);
-        this.items = raw ? JSON.parse(raw) : [];
+        try {
+          this.items = raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          this.items = [];
+        }
         return this.items;
       }
 
@@ -930,36 +449,151 @@ export default function Home({ initialView = 'dashboard' }) {
         this.confirmCb = null;
         this.initialView = initialView;
         this.tokenKey = 'cashmoney:token';
+        this.userKey = 'cashmoney:user';
+        this.user = null;
+        this.setupRepoKeys();
         const today = new Date();
         const first = new Date(today.getFullYear(), today.getMonth(), 1);
         this.range = { start: U.iso(first), end: U.iso(today) };
+      }
+      cacheKey(key) {
+        return this.user ? `cashmoney:user-${this.user.id}:${key}` : `cashmoney:${key}`;
+      }
+      setupRepoKeys() {
+        this.expenses.key = this.cacheKey('expenses');
+        this.incomes.key = this.cacheKey('incomes');
+        this.allocations.key = this.cacheKey('allocations');
+      }
+      async setUser(user) {
+        this.user = user || null;
+        if (user) {
+          await this.store.set(this.userKey, JSON.stringify(user));
+        } else {
+          await this.store.set(this.userKey, '');
+        }
+        this.setupRepoKeys();
+        this.updateAuthStatus();
+        this.updateUserDisplay();
+      }
+      updateUserDisplay() {
+        const userTile = document.getElementById('userTile');
+        const userName = document.getElementById('userNameDisplay');
+        if (!userTile || !userName) return;
+        if (this.user) {
+          userName.textContent = `Halo, ${this.user.name}`;
+          userTile.classList.remove('hidden');
+        } else {
+          userTile.classList.add('hidden');
+          userName.textContent = '';
+        }
+      }
+      updateAuthStatus() {
+        const btn = document.getElementById('authBtn');
+        if (btn) {
+          if (this.token) {
+            btn.textContent = 'Keluar';
+            btn.classList.add('bg-teal-50', 'text-teal-700', 'border-teal-300');
+          } else {
+            btn.textContent = 'Masuk';
+            btn.classList.remove('bg-teal-50', 'text-teal-700', 'border-teal-300');
+          }
+        }
+      }
+      async loadAllData() {
+        const params = { start: this.range.start, end: this.range.end };
+        const fallbackCleanup = setTimeout(() => {
+          this.hideLoading();
+        }, 1500);
+
+        try {
+          const el = document.getElementById('loadingOverlay');
+          if (el) el.style.opacity = '1';
+
+          await Promise.all([
+            this.expenses.load(params),
+            this.incomes.load(params),
+            this.allocations.load(params)
+          ]);
+        } catch (e) {
+          if (e && e.code === 'unauthorized') {
+            await this.store.set(this.tokenKey, '');
+            this.token = null;
+            this.updateAuthStatus();
+            this.openModal('loginModal', true);
+            toast('Sesi berakhir. Silakan login kembali.', 'err');
+            return;
+          }
+          console.error('Gagal memuat data:', e);
+          toast('Gagal menyinkronkan data dengan server, memakai cache lokal', 'err');
+        } finally {
+          clearTimeout(fallbackCleanup);
+          this.renderAll();
+          this.hideLoading();
+        }
+      }
+      async logout() {
+        try {
+          if (this.token) {
+            await fetch(`${API_BASE}/logout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Accept': 'application/json'
+              }
+            }).catch(() => null);
+          }
+        } catch (e) {
+          // ignore
+        }
+        await this.store.set(this.tokenKey, '');
+        this.token = null;
+        await this.setUser(null);
+        this.expenses.items = [];
+        this.incomes.items = [];
+        this.allocations.items = [];
+        await this.expenses.persist();
+        await this.incomes.persist();
+        await this.allocations.persist();
+
+        this.renderAll();
+
+        this.openModal('loginModal', true);
+        toast('Berhasil keluar sesi');
       }
       async init() {
         this.bindNav();
         this.bindModals();
         this.bindRangePicker();
         this.switchView(this.initialView);
-        this.renderAll();
-
+        
         this.token = await this.store.get(this.tokenKey);
+        if (this.token) {
+          const rawUser = await this.store.get(this.userKey);
+          if (rawUser) {
+            try {
+              await this.setUser(JSON.parse(rawUser));
+            } catch (_) {
+              await this.setUser(null);
+            }
+          }
+          const me = await this.fetchMe();
+          if (me) {
+            await this.setUser(me);
+          }
+        }
+
+        this.updateAuthStatus();
+
         if (!this.token) {
-          toast('Token API backend tidak ditemukan. Simpan token Laravel di localStorage key cashmoney:token untuk sinkronisasi.', 'err');
-        }
-
-        const fallbackCleanup = setTimeout(() => {
+          this.openModal('loginModal', true);
           this.hideLoading();
-        }, 400);
-
-        try {
-          await Promise.all([this.expenses.load(), this.incomes.load(), this.allocations.load()]);
-        } catch (e) {
-          console.error('Gagal memuat data tersimpan:', e);
-          toast('Gagal memuat data tersimpan, memulai dengan data kosong', 'err');
-        } finally {
-          clearTimeout(fallbackCleanup);
           this.renderAll();
-          this.hideLoading();
+          return;
         }
+
+        await this.loadAllData();
+        // Mark splash as shown so it won't show again this session
+        try { sessionStorage.setItem('cmm:splashShown', '1'); } catch(_) {}
       }
       hideLoading() {
         // fade out built-in loading overlay (if present)
@@ -969,26 +603,143 @@ export default function Home({ initialView = 'dashboard' }) {
           el.style.transition = 'opacity .25s ease';
           setTimeout(() => el.remove(), 260);
         }
-        // also remove splash overlay if present
+        // Remove splash overlay — only show it once per session, then remove immediately on subsequent navigations
         const splash = document.getElementById('splashOverlay');
         if (splash) {
-          splash.classList.add('splash-hidden');
-          setTimeout(() => splash.remove(), 380);
+          const alreadyShown = (() => { try { return sessionStorage.getItem('cmm:splashShown') === '1'; } catch(_) { return false; } })();
+          if (alreadyShown) {
+            splash.remove();
+          } else {
+            splash.classList.add('splash-hidden');
+            setTimeout(() => splash.remove(), 380);
+          }
+          try { sessionStorage.setItem('cmm:splashShown', '1'); } catch (_) {}
         }
       }
       switchView(view) {
-        document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-        const target = document.getElementById('view-' + view);
-        if (target) target.classList.add('active');
-        document.querySelectorAll('.nav-link').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
-        document.querySelectorAll('.nav-link-mobile').forEach((n) => {
-          const on = n.dataset.view === view;
-          n.classList.toggle('active', on);
-          n.classList.toggle('text-teal-700', on);
-          n.classList.toggle('text-inksoft', !on);
+        const main = document.querySelector('main');
+        // Lightweight fade effect between views (no splash, just a subtle transition)
+        if (main) {
+          main.style.opacity = '0';
+          main.style.transition = 'opacity 0.15s ease';
+        }
+        setTimeout(() => {
+          document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+          const target = document.getElementById('view-' + view);
+          if (target) target.classList.add('active');
+          document.querySelectorAll('.nav-link').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
+          document.querySelectorAll('.nav-link-mobile').forEach((n) => {
+            const on = n.dataset.view === view;
+            n.classList.toggle('active', on);
+            n.classList.toggle('text-teal-700', on);
+            n.classList.toggle('text-inksoft', !on);
+          });
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          if (view === 'reports') this.renderReports();
+          if (main) {
+            main.style.opacity = '1';
+          }
+        }, 150);
+      }
+      toggleAlertDropdown() {
+        const dd = document.getElementById('alertDropdown');
+        if (!dd) return;
+        const isHidden = dd.classList.contains('hidden');
+        if (isHidden) {
+          this.renderAlertDropdown();
+          dd.classList.remove('hidden');
+        } else {
+          dd.classList.add('hidden');
+        }
+      }
+      openAlertDropdown() {
+        const dd = document.getElementById('alertDropdown');
+        if (!dd) return;
+        this.renderAlertDropdown();
+        dd.classList.remove('hidden');
+      }
+      renderAlertDropdown() {
+        const unpaid = this.expenses.items
+          .filter((x) => (x.category === 'tetap' || x.category === 'berkala') && x.status === 'unpaid' && !x.isEstimate)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        const countEl = document.getElementById('alertDropdownCount');
+        if (countEl) countEl.textContent = unpaid.length;
+        const listEl = document.getElementById('alertDropdownList');
+        if (!listEl) return;
+        if (!unpaid.length) {
+          listEl.innerHTML = `<div class="flex flex-col items-center gap-2 py-6 px-4 text-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4FA88E" strokeWidth="1.8"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <p class="text-sm font-semibold text-teal-700">Semua tagihan lunas!</p>
+            <p class="text-[12px] text-inksoft">Tidak ada tagihan yang tertunda. Mantap! 🎉</p>
+          </div>`;
+          return;
+        }
+        listEl.innerHTML = `
+          <div class="border-b border-line px-4 py-3">
+            <p class="text-sm font-semibold text-ink">Notifikasi Tagihan</p>
+            <p class="text-[12px] text-inksoft">Gunakan tombol ✓ di sebelah kanan untuk menandai lunas langsung dari notifikasi.</p>
+          </div>
+          <div class="space-y-2 p-2">
+            ${unpaid.map((x) => {
+              const days = U.daysBetween(x.date, U.todayStr());
+              const overdue = days > 0;
+              const dueBadge = overdue
+                ? `<span class="inline-flex items-center gap-1 text-[10.5px] font-semibold bg-rust-50 text-rust-600 rounded-full px-2 py-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Terlambat ${days}h</span>`
+                : `<span class="inline-flex items-center gap-1 text-[10.5px] font-semibold bg-amber-50 text-amber-600 rounded-full px-2 py-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${U.fmtDateShort(x.date)}</span>`;
+              return `<div class="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl border border-line bg-white shadow-sm">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${overdue ? 'bg-rust-50' : 'bg-amber-50'}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${overdue ? '#973A19' : '#B87511'}" strokeWidth="2"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-ink truncate">${x.subcategory}</p>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-inksoft">
+                    ${dueBadge}
+                    <span>${EXPENSE_CATS[x.category]?.label ?? x.category}</span>
+                  </div>
+                </div>
+                <div class="flex flex-col items-end gap-2 shrink-0">
+                  <span class="font-mono text-sm font-semibold text-ink">${U.fmtIDR(x.amount)}</span>
+                  <button data-mark-paid="${x.id}" class="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700 hover:bg-teal-100 transition">✓ Lunas</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        `;
+        // Bind mark-as-paid buttons
+        listEl.querySelectorAll('[data-mark-paid]').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.markPaid(btn.dataset.markPaid);
+          });
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        if (view === 'reports') this.renderReports();
+      }
+      async markPaid(id) {
+        const item = this.expenses.items.find((x) => x.id === id);
+        if (!item) return;
+        // Optimistic update
+        item.status = 'paid';
+        await this.expenses.persist();
+        // Sync to backend
+        try {
+          if (this.token) {
+            const payload = { ...item, status: 'paid' };
+            await fetch(`${API_BASE}/expenses/${id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`,
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+          }
+        } catch(e) {
+          console.warn('Sync markPaid failed:', e);
+        }
+        toast(`${item.subcategory} ditandai lunas ✓`);
+        this.renderAll();
+        // Re-render the dropdown to reflect updated state
+        this.renderAlertDropdown();
       }
       bindNav() {
         const go = (view) => {
@@ -1036,7 +787,7 @@ export default function Home({ initialView = 'dashboard' }) {
               this.range.start = U.iso(selectedDates[0]);
               this.range.end = U.iso(selectedDates[1]);
               updateLabel();
-              this.renderAll();
+              this.loadAllData();
             }
           },
         });
@@ -1044,9 +795,29 @@ export default function Home({ initialView = 'dashboard' }) {
       }
       bindModals() {
         // auth bindings
-        document.getElementById('authBtn')?.addEventListener('click', () => this.openModal('loginModal'));
+        document.getElementById('authBtn')?.addEventListener('click', async () => {
+          if (this.token) {
+            if (confirm('Apakah Anda yakin ingin keluar dari sesi?')) {
+              await this.logout();
+            }
+          } else {
+            this.openModal('loginModal');
+          }
+        });
         document.getElementById('loginCancel')?.addEventListener('click', () => this.closeModal('loginModal'));
+        document.getElementById('loginClose')?.addEventListener('click', () => this.closeModal('loginModal'));
+        document.getElementById('registerLink')?.addEventListener('click', () => {
+          this.closeModal('loginModal');
+          this.openModal('registerModal');
+        });
         document.getElementById('loginForm')?.addEventListener('submit', (e) => this.loginSubmit(e));
+        document.getElementById('registerCancel')?.addEventListener('click', () => this.closeModal('registerModal'));
+        document.getElementById('registerClose')?.addEventListener('click', () => this.closeModal('registerModal'));
+        document.getElementById('registerSwitchLogin')?.addEventListener('click', () => {
+          this.closeModal('registerModal');
+          this.openModal('loginModal');
+        });
+        document.getElementById('registerForm')?.addEventListener('submit', (e) => this.registerSubmit(e));
 
         document.getElementById('quickAddBtn')?.addEventListener('click', () => this.openModal('quickAddModal'));
         document.getElementById('quickAddCancel')?.addEventListener('click', () => this.closeModal('quickAddModal'));
@@ -1098,7 +869,7 @@ export default function Home({ initialView = 'dashboard' }) {
         if (!email || !password) return toast('Email dan password wajib', 'err');
 
         try {
-          const res = await fetch(`${API_BASE}/auth/login`, {
+          const res = await fetch(`${API_BASE}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -1114,28 +885,101 @@ export default function Home({ initialView = 'dashboard' }) {
 
           await this.store.set(this.tokenKey, token);
           this.token = token;
+          await this.setUser(json.user);
           toast('Login berhasil');
           this.closeModal('loginModal');
 
           // reload backend data
-          try {
-            await Promise.all([this.expenses.load(), this.incomes.load(), this.allocations.load()]);
-            this.renderAll();
-          } catch (err) {
-            console.warn('Load after login failed', err);
-          }
+          await this.loadAllData();
         } catch (err) {
           console.error(err);
           toast(err.message || 'Login gagal', 'err');
         }
       }
-      openModal(id) {
+
+      async registerSubmit(e) {
+        e.preventDefault();
+        const name = document.getElementById('register_name')?.value;
+        const email = document.getElementById('register_email')?.value;
+        const password = document.getElementById('register_password')?.value;
+        const confirmPassword = document.getElementById('register_password_confirmation')?.value;
+
+        if (!name || !email || !password || !confirmPassword) return toast('Semua field wajib diisi', 'err');
+        if (password !== confirmPassword) return toast('Password dan konfirmasi harus sama', 'err');
+
+        try {
+          const res = await fetch(`${API_BASE}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ name, email, password, password_confirmation: confirmPassword }),
+          });
+
+          const json = await res.json();
+          if (!res.ok) {
+            const message = json?.message || (json?.errors ? Object.values(json.errors).flat().join(' ') : 'Registrasi gagal');
+            throw new Error(message);
+          }
+
+          const token = json?.token;
+          if (!token) throw new Error('Token tidak diterima');
+
+          await this.store.set(this.tokenKey, token);
+          this.token = token;
+          await this.setUser(json.user);
+          toast('Registrasi berhasil');
+          this.closeModal('registerModal');
+
+          await this.loadAllData();
+        } catch (err) {
+          console.error(err);
+          toast(err.message || 'Registrasi gagal', 'err');
+        }
+      }
+
+      async fetchMe() {
+        if (!this.token) return null;
+        try {
+          const res = await fetch(`${API_BASE}/me`, {
+            headers: { 'Authorization': `Bearer ${this.token}`, Accept: 'application/json' },
+          });
+          if (!res.ok) {
+            if (res.status === 401) {
+              await this.store.set(this.tokenKey, '');
+              this.token = null;
+              await this.setUser(null);
+            }
+            return null;
+          }
+          return await res.json();
+        } catch (err) {
+          return null;
+        }
+      }
+      openModal(id, forceFullscreen = false) {
         const el = document.getElementById(id);
-        if (el) el.classList.add('active');
+        if (el) {
+          el.classList.add('active');
+          if (id === 'loginModal' && forceFullscreen) {
+            el.classList.add('login-fullscreen');
+            const closeBtn = document.getElementById('loginClose');
+            const cancelBtn = document.getElementById('loginCancel');
+            if (closeBtn) closeBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+          }
+        }
       }
       closeModal(id) {
         const el = document.getElementById(id);
-        if (el) el.classList.remove('active');
+        if (el) {
+          el.classList.remove('active');
+          if (id === 'loginModal') {
+            el.classList.remove('login-fullscreen');
+            const closeBtn = document.getElementById('loginClose');
+            const cancelBtn = document.getElementById('loginCancel');
+            if (closeBtn) closeBtn.style.display = '';
+            if (cancelBtn) cancelBtn.style.display = '';
+          }
+        }
       }
       confirm(cb) {
         this.confirmCb = cb;
@@ -1392,11 +1236,15 @@ export default function Home({ initialView = 'dashboard' }) {
         return changed;
       }
       renderAll() {
-        this.renderDashboard();
-        this.renderExpenseList();
-        this.renderIncomeList();
-        this.renderAllocations();
-        if (document.getElementById('view-reports')?.classList.contains('active')) this.renderReports();
+        try {
+          this.renderDashboard();
+          this.renderExpenseList();
+          this.renderIncomeList();
+          this.renderAllocations();
+          if (document.getElementById('view-reports')?.classList.contains('active')) this.renderReports();
+        } catch (e) {
+          console.error('Error rendering dashboard components:', e);
+        }
       }
       currentExpenses() {
         return this.expenses.inRange(this.range.start, this.range.end).filter((x) => !x.isEstimate);
@@ -1451,24 +1299,33 @@ export default function Home({ initialView = 'dashboard' }) {
         }
         const listEl = document.getElementById('unpaidList');
         if (listEl) {
-          listEl.innerHTML = unpaid.length
-            ? unpaid.map((x) => {
-                const days = U.daysBetween(x.date, U.todayStr());
-                const overdue = days > 0;
-                return `<div class="flex items-center justify-between gap-3 p-3 rounded-xl border border-line">
-        <div class="min-w-0">
-          <p class="text-sm font-medium truncate">${x.subcategory}</p>
-          <p class="text-[12px] ${overdue ? 'text-rust-600' : 'text-inksoft'}">${overdue ? `Terlambat ${days} hari` : `Jatuh tempo ${U.fmtDateID(x.date)}`} · ${EXPENSE_CATS[x.category].label}</p>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="font-mono text-sm font-semibold">${U.fmtIDR(x.amount)}</span>
-          <button data-mark-paid="${x.id}" class="text-[12px] font-semibold text-teal-700 border border-teal-200 rounded-lg px-2.5 py-1.5 hover:bg-teal-50">Tandai Lunas</button>
-        </div>
-      </div>`;
-              })
-                .join('')
-            : `<p class="text-sm text-inksoft py-4 text-center">Tidak ada tagihan tertunda. Mantap! 🎉</p>`;
-          listEl.querySelectorAll('[data-mark-paid]').forEach((b) => b.addEventListener('click', () => this.markPaid(b.dataset.markPaid)));
+          if (!unpaid.length) {
+            listEl.innerHTML = `<div class="flex items-center gap-2.5 py-4 px-3 rounded-xl bg-teal-50 border border-teal-100">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6F5C" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <p class="text-sm font-medium text-teal-700">Semua tagihan sudah lunas! 🎉</p>
+            </div>`;
+          } else {
+            listEl.innerHTML = unpaid.map((x) => {
+              const days = U.daysBetween(x.date, U.todayStr());
+              const overdue = days > 0;
+              return `<div class="flex items-center justify-between gap-3 p-3 rounded-xl border ${overdue ? 'border-rust-200 bg-rust-50/30' : 'border-line'} transition">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${overdue ? 'bg-rust-100' : 'bg-amber-50'}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${overdue ? '#973A19' : '#B87511'}" strokeWidth="2.2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium truncate text-ink">${x.subcategory}</p>
+                    <p class="text-[11.5px] ${overdue ? 'text-rust-600 font-semibold' : 'text-inksoft'}">${overdue ? `⚠ Terlambat ${days} hari` : `Jatuh tempo ${U.fmtDateID(x.date)}`} · ${EXPENSE_CATS[x.category]?.label ?? x.category}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="font-mono text-sm font-bold text-ink">${U.fmtIDR(x.amount)}</span>
+                  <button data-mark-paid="${x.id}" class="text-[11.5px] font-semibold text-teal-700 bg-white border border-teal-200 rounded-lg px-2.5 py-1.5 hover:bg-teal-50 hover:border-teal-400 transition">✓ Lunas</button>
+                </div>
+              </div>`;
+            }).join('');
+            listEl.querySelectorAll('[data-mark-paid]').forEach((b) => b.addEventListener('click', () => this.markPaid(b.dataset.markPaid)));
+          }
         }
         this.renderCascade(exp);
         this.renderTrendChart(exp, inc);
@@ -1504,14 +1361,14 @@ export default function Home({ initialView = 'dashboard' }) {
             )
             .join('')}
         </div>
-        <svg width="22" height="16" viewBox="0 0 24 24" fill="none" stroke="#7EC2AC" stroke-width="2.4" class="shrink-0 mb-6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <svg width="22" height="16" viewBox="0 0 24 24" fill="none" stroke="#7EC2AC" strokeWidth="2.4" class="shrink-0 mb-6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="flex flex-col items-center gap-1 shrink-0">
           <div class="w-24 h-24 rounded-xl bg-teal-700 flex flex-col items-center justify-center text-white">
             <span class="text-[10px] opacity-80">Minggu ini</span>
             <span class="font-mono text-[13px] font-bold">${U.fmtIDR(weekTotal)}</span>
           </div>
         </div>
-        <svg width="22" height="16" viewBox="0 0 24 24" fill="none" stroke="#7EC2AC" stroke-width="2.4" class="shrink-0 mb-6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <svg width="22" height="16" viewBox="0 0 24 24" fill="none" stroke="#7EC2AC" strokeWidth="2.4" class="shrink-0 mb-6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="flex flex-col items-center gap-1 shrink-0">
           <div class="w-28 h-24 rounded-xl bg-ink flex flex-col items-center justify-center text-white">
             <span class="text-[10px] opacity-70">${U.monthLabel(monthKey)}</span>
@@ -1796,6 +1653,14 @@ export default function Home({ initialView = 'dashboard' }) {
     const app = new App(initialView);
     
     // Start progress bar animation
+    const isSplashAlreadyShown = (() => {
+      try {
+        return sessionStorage.getItem('cmm:splashShown') === '1';
+      } catch (_) {
+        return false;
+      }
+    })();
+
     const startProgress = () => {
       const progressBar = document.querySelector('.splash-progress-bar::after');
       const progressText = document.getElementById('progressPercent');
@@ -1818,14 +1683,520 @@ export default function Home({ initialView = 'dashboard' }) {
       updateProgress();
     };
 
-    startProgress();
+    if (!isSplashAlreadyShown) {
+      startProgress();
+    } else {
+      const splash = document.getElementById('splashOverlay');
+      if (splash) {
+        splash.classList.add('splash-hidden');
+        setTimeout(() => splash.remove(), 10);
+      }
+    }
     app.init();
     window.__cashApp = app;
   }, [initialView]);
 
   return (
     <div className="min-h-screen text-ink">
-      <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+      
+<div id="loadingOverlay" className="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center gap-3">
+  <div className="w-10 h-10 border-[3px] border-teal-200 border-t-teal-700 rounded-full animate-spin"></div>
+  <p className="text-sm text-inksoft font-medium">Memuat data kamu...</p>
+</div>
+
+<div id="app" className="min-h-screen">
+
+  {/* ============ TOP BAR ============ */}
+  <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-line">
+    <div className="flex items-center justify-between gap-3 px-4 md:px-6 h-16">
+      <div className="flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-xl bg-teal-700 flex items-center justify-center shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div className="hidden sm:block leading-tight">
+          <p className="font-display font-bold text-[15px] text-ink">CashMoneyManagement</p>
+          <p className="text-[11px] text-inksoft -mt-0.5">Cashflow harian → mingguan → bulanan</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button id="rangeBtn" className="flex items-center gap-2 border border-line rounded-xl px-3 h-10 text-sm bg-white hover:border-teal-400 transition">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16594A" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span id="rangeLabel" className="font-mono text-[12.5px] text-ink whitespace-nowrap"></span>
+        </button>
+        <input id="rangeInput" className="hidden" />
+
+        <div className="relative">
+          <button id="alertBell" className="relative w-10 h-10 rounded-xl border border-line bg-white flex items-center justify-center hover:border-amber-400 transition">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4B5A55" strokeWidth="2" strokeLinecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span id="alertDot" className="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rust-500 text-white text-[10px] font-bold items-center justify-center">0</span>
+          </button>
+          <div id="alertDropdown" className="hidden absolute right-0 top-[calc(100%+8px)] w-80 max-w-[88vw] bg-white rounded-2xl border border-line shadow-lg z-40 max-h-[70vh] overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-line flex items-center justify-between shrink-0">
+              <p className="font-display font-semibold text-[13.5px]">Tagihan Belum Dibayar</p>
+              <span id="alertDropdownCount" className="text-[11px] font-semibold bg-rust-50 text-rust-600 rounded-full px-2 py-0.5">0</span>
+            </div>
+            <div id="alertDropdownList" className="overflow-y-auto p-2 space-y-1.5"></div>
+          </div>
+        </div>
+
+        <div id="userTile" className="hidden items-center gap-2 rounded-2xl border border-line bg-white px-3 py-2 text-sm text-inksoft">
+          <span className="font-medium text-ink">Halo,</span>
+          <span id="userNameDisplay" className="font-semibold text-ink"></span>
+        </div>
+
+        <button id="authBtn" className="flex items-center gap-1.5 border border-line rounded-xl px-3 h-10 text-sm bg-white hover:border-teal-400 transition">Masuk</button>
+
+        <button id="quickAddBtn" className="flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 transition text-white rounded-xl px-3.5 h-10 text-sm font-semibold">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span className="hidden sm:inline">Tambah</span>
+        </button>
+      </div>
+    </div>
+
+    {/* alert banner */}
+    <div id="alertBanner" className="hidden border-t border-amber-200 bg-amber-50 px-4 md:px-6 py-2 text-[13px] text-amber-700 flex items-center gap-2 cursor-pointer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B87511" strokeWidth="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <span id="alertBannerText"></span>
+      <span className="ml-auto underline font-medium shrink-0">Lihat detail</span>
+    </div>
+  </header>
+
+  <div className="flex">
+    {/* ============ SIDEBAR (desktop) ============ */}
+    <nav className="hidden md:flex flex-col w-60 shrink-0 border-r border-line bg-white min-h-[calc(100vh-64px)] px-3 py-5 gap-1">
+      <a href="/dashboard" data-view="dashboard" className="nav-link active flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" strokeWidth="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a href="/expenses" data-view="expenses" className="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" strokeWidth="2"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+        Pengeluaran
+      </a>
+      <a href="/incomes" data-view="incomes" className="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Pemasukan
+      </a>
+      <a href="/allocations" data-view="allocations" className="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 7"/></svg>
+        Dana Alokasi
+      </a>
+      <a href="/reports" data-view="reports" className="nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-teal-50 transition">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#101A17" strokeWidth="2"><path d="M8 17V9M13 17V5M18 17v-5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        Laporan
+      </a>
+
+      <div className="mt-auto pt-4 border-t border-line">
+        <p className="text-[11px] text-inksoft px-3.5 leading-relaxed">Data tersimpan otomatis untuk sesi Claude ini.</p>
+      </div>
+    </nav>
+
+    {/* ============ MAIN ============ */}
+    <main className="flex-1 min-w-0 px-4 md:px-6 py-5 pb-28 md:pb-8">
+
+      {/* ---------- DASHBOARD ---------- */}
+      <section id="view-dashboard" className="view active space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-xl font-bold text-ink">Dashboard</h1>
+            <p id="dashPeriodLabel" className="text-[13px] text-inksoft"></p>
+          </div>
+        </div>
+
+        {/* summary cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-surface rounded-2xl shadow-card border border-line p-4">
+            <p className="text-[12px] text-inksoft font-medium">Pemasukan</p>
+            <p id="sumIncome" className="font-mono font-bold text-lg text-teal-700 mt-1">Rp 0</p>
+          </div>
+          <div className="bg-surface rounded-2xl shadow-card border border-line p-4">
+            <p className="text-[12px] text-inksoft font-medium">Pengeluaran</p>
+            <p id="sumExpense" className="font-mono font-bold text-lg text-rust-600 mt-1">Rp 0</p>
+          </div>
+          <div className="bg-surface rounded-2xl shadow-card border border-line p-4">
+            <p className="text-[12px] text-inksoft font-medium">Alokasi Dana</p>
+            <p id="sumAllocation" className="font-mono font-bold text-lg text-amber-600 mt-1">Rp 0</p>
+          </div>
+          <div id="sumBalanceCard" className="rounded-2xl shadow-card border p-4 bg-teal-700 border-teal-700">
+            <p className="text-[12px] text-teal-100 font-medium flex items-center gap-1">Saldo Bersih <span id="balanceBadge" className="text-[10px] bg-white/20 rounded-full px-1.5 py-0.5">SURPLUS</span></p>
+            <p id="sumBalance" className="font-mono font-bold text-lg text-white mt-1">Rp 0</p>
+          </div>
+        </div>
+
+        {/* cascade */}
+        <div className="bg-surface rounded-2xl shadow-card border border-line p-4 md:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-display font-semibold text-[15px]">Alur Pengeluaran: Harian → Mingguan → Bulanan</h2>
+              <p className="text-[12px] text-inksoft">Total harian dijumlah tiap hari Minggu (mingguan), lalu tiap minggu terakhir bulan dijumlah jadi total bulanan.</p>
+            </div>
+          </div>
+          <div id="cascadeWrap" className="overflow-x-auto pb-1"></div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-line p-4 lg:col-span-2">
+            <h2 className="font-display font-semibold text-[15px] mb-3">Tren Cashflow Mingguan</h2>
+            <div className="h-64"><canvas id="chartTrend"></canvas></div>
+          </div>
+          <div className="bg-surface rounded-2xl shadow-card border border-line p-4">
+            <h2 className="font-display font-semibold text-[15px] mb-3">Komposisi Pengeluaran</h2>
+            <div className="h-64"><canvas id="chartExpenseDonut"></canvas></div>
+          </div>
+        </div>
+
+        {/* unpaid bills */}
+        <div className="bg-surface rounded-2xl shadow-card border border-line p-4">
+          <h2 className="font-display font-semibold text-[15px] mb-3 flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B87511" strokeWidth="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+            Tagihan Belum Terbayar
+          </h2>
+          <div id="unpaidList" className="space-y-2"></div>
+        </div>
+      </section>
+
+      {/* ---------- EXPENSES ---------- */}
+      <section id="view-expenses" className="view space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-xl font-bold text-ink">Pengeluaran</h1>
+            <p className="text-[13px] text-inksoft">Tetap, Berkala, dan Dinamis / Variabel</p>
+          </div>
+          <button data-add="expense" className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Pengeluaran</button>
+        </div>
+
+        <div className="flex flex-wrap gap-2" id="expenseCatTabs">
+          <button data-cat="all" className="tab-pill active px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Semua</button>
+          <button data-cat="tetap" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Tetap</button>
+          <button data-cat="berkala" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Berkala</button>
+          <button data-cat="dinamis" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Dinamis / Variabel</button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-surface rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Tetap</p><p id="totTetap" className="font-mono font-bold text-teal-700">Rp 0</p></div>
+          <div className="bg-surface rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Berkala</p><p id="totBerkala" className="font-mono font-bold text-amber-600">Rp 0</p></div>
+          <div className="bg-surface rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Dinamis</p><p id="totDinamis" className="font-mono font-bold text-rust-600">Rp 0</p></div>
+        </div>
+
+        <div id="expenseList" className="space-y-2"></div>
+      </section>
+
+      {/* ---------- INCOMES ---------- */}
+      <section id="view-incomes" className="view space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-xl font-bold text-ink">Pemasukan</h1>
+            <p className="text-[13px] text-inksoft">Earned, Passive, dan Portfolio/Investment Income</p>
+          </div>
+          <button data-add="income" className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Pemasukan</button>
+        </div>
+
+        <div className="flex flex-wrap gap-2" id="incomeCatTabs">
+          <button data-cat="all" className="tab-pill active px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Semua</button>
+          <button data-cat="earned" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Earned / Active</button>
+          <button data-cat="passive" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Passive</button>
+          <button data-cat="portfolio" className="tab-pill px-3.5 h-9 rounded-full text-[13px] font-medium border border-line bg-white">Portfolio / Investment</button>
+        </div>
+
+        <div id="incomeList" className="space-y-2"></div>
+      </section>
+
+      {/* ---------- ALLOCATIONS ---------- */}
+      <section id="view-allocations" className="view space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-xl font-bold text-ink">Dana Alokasi</h1>
+            <p className="text-[13px] text-inksoft">Darurat, Asuransi, Investasi, dan Cadangan/Likuiditas</p>
+          </div>
+          <button data-add="allocation" className="bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl px-4 h-10">+ Catat Alokasi</button>
+        </div>
+
+        <div id="allocationCards" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        <div id="allocationList" className="space-y-2"></div>
+      </section>
+
+      {/* ---------- REPORTS ---------- */}
+      <section id="view-reports" className="view space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-xl font-bold text-ink">Laporan</h1>
+            <p className="text-[13px] text-inksoft">Ringkasan interaktif untuk periode yang dipilih — bisa diekspor ke PDF.</p>
+          </div>
+          <button id="exportPdfBtn" className="flex items-center gap-2 bg-rust-500 hover:bg-rust-600 text-white text-sm font-semibold rounded-xl px-4 h-10">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            Export PDF
+          </button>
+        </div>
+
+        <div id="reportContent" className="bg-surface rounded-2xl shadow-card border border-line p-5 md:p-7 space-y-6">
+          <div className="flex items-center justify-between border-b border-line pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-teal-700 flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div>
+                <p className="font-display font-bold text-ink">CashMoneyManagement</p>
+                <p className="text-[12px] text-inksoft">Laporan Keuangan Pribadi</p>
+              </div>
+            </div>
+            <p id="reportPeriod" className="font-mono text-[12.5px] text-inksoft text-right"></p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Total Pemasukan</p><p id="repIncome" className="font-mono font-bold text-teal-700">Rp 0</p></div>
+            <div className="rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Total Pengeluaran</p><p id="repExpense" className="font-mono font-bold text-rust-600">Rp 0</p></div>
+            <div className="rounded-xl border border-line p-3"><p className="text-[11px] text-inksoft">Total Alokasi</p><p id="repAllocation" className="font-mono font-bold text-amber-600">Rp 0</p></div>
+            <div className="rounded-xl border border-line p-3 bg-teal-700"><p className="text-[11px] text-teal-100">Saldo Akhir</p><p id="repBalance" className="font-mono font-bold text-white">Rp 0</p></div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div>
+              <h3 className="font-display font-semibold text-[14px] mb-2">Pengeluaran per Kategori</h3>
+              <div className="h-56"><canvas id="chartRepExpense"></canvas></div>
+            </div>
+            <div>
+              <h3 className="font-display font-semibold text-[14px] mb-2">Pemasukan per Kategori</h3>
+              <div className="h-56"><canvas id="chartRepIncome"></canvas></div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-display font-semibold text-[14px] mb-2">Tren Bulanan (6 Bulan Terakhir)</h3>
+            <div className="h-64"><canvas id="chartRepTrend"></canvas></div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div>
+              <h3 className="font-display font-semibold text-[14px] mb-2">Rincian Pengeluaran</h3>
+              <table className="w-full text-[12.5px]"><tbody id="repExpenseTable"></tbody></table>
+            </div>
+            <div>
+              <h3 className="font-display font-semibold text-[14px] mb-2">Rincian Pemasukan</h3>
+              <table className="w-full text-[12.5px]"><tbody id="repIncomeTable"></tbody></table>
+            </div>
+            <div>
+              <h3 className="font-display font-semibold text-[14px] mb-2">Rincian Alokasi Dana</h3>
+              <table className="w-full text-[12.5px]"><tbody id="repAllocationTable"></tbody></table>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
+            <h3 className="font-display font-semibold text-[14px] mb-2 text-teal-800">Ringkasan & Saran</h3>
+            <ul id="repSuggestions" className="space-y-1.5 text-[13px] text-teal-800 list-disc list-inside"></ul>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  {/* ============ MOBILE BOTTOM NAV ============ */}
+  <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-line flex items-stretch h-16 px-1">
+    <a href="/dashboard" data-view="dashboard" className="nav-link-mobile active flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      <span className="text-[10px] font-medium">Dashboard</span>
+    </a>
+    <a href="/expenses" data-view="expenses" className="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+      <span className="text-[10px] font-medium">Keluar</span>
+    </a>
+    <a href="/incomes" data-view="incomes" className="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      <span className="text-[10px] font-medium">Masuk</span>
+    </a>
+    <a href="/allocations" data-view="allocations" className="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 7"/></svg>
+      <span className="text-[10px] font-medium">Alokasi</span>
+    </a>
+    <a href="/reports" data-view="reports" className="nav-link-mobile flex-1 flex flex-col items-center justify-center gap-0.5 text-inksoft">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 17V9M13 17V5M18 17v-5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      <span className="text-[10px] font-medium">Laporan</span>
+    </a>
+  </nav>
+</div>
+
+{/* ============ QUICK ADD CHOOSER ============ */}
+<div id="quickAddModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center">
+  <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-80 p-4 space-y-2">
+    <p className="font-display font-semibold text-sm px-1 pb-1">Mau catat apa?</p>
+    <button data-add="expense" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-rust-50 text-left">
+      <span className="w-9 h-9 rounded-lg bg-rust-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8471F" strokeWidth="2.3"><path d="M5 12h14"/></svg></span>
+      <span><span className="block text-sm font-semibold">Pengeluaran</span><span className="block text-[12px] text-inksoft">Tetap, berkala, atau dinamis</span></span>
+    </button>
+    <button data-add="income" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-teal-50 text-left">
+      <span className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F6F5C" strokeWidth="2.3"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+      <span><span className="block text-sm font-semibold">Pemasukan</span><span className="block text-[12px] text-inksoft">Earned, passive, atau investment</span></span>
+    </button>
+    <button data-add="allocation" className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-amber-50 text-left">
+      <span className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B87511" strokeWidth="2.3"><path d="M12 2v20"/></svg></span>
+      <span><span className="block text-sm font-semibold">Dana Alokasi</span><span className="block text-[12px] text-inksoft">Darurat, asuransi, investasi, cadangan</span></span>
+    </button>
+    <button id="quickAddCancel" className="w-full text-center py-2.5 text-sm font-medium text-inksoft">Batal</button>
+  </div>
+</div>
+
+{/* ============ LOGIN MODAL ============ */}
+<div id="loginModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-end md:items-center justify-center">
+  <form id="loginForm" className="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-80 p-5 space-y-3.5">
+    <div className="flex items-center justify-between">
+      <h3 className="font-display font-bold text-[15px]">Masuk ke CashMoney</h3>
+      <button type="button" id="loginClose" className="modal-close text-inksoft text-xl leading-none">×</button>
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Email</label>
+      <input id="login_email" type="email" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Password</label>
+      <input id="login_password" type="password" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div className="text-sm text-inksoft">
+      <button type="button" id="registerLink" className="font-medium text-teal-700 hover:underline">Belum punya akun? Daftar</button>
+    </div>
+    <div className="flex gap-2 pt-1">
+      <button type="button" id="loginCancel" className="text-inksoft text-sm font-medium px-4 h-11 rounded-xl border border-line">Batal</button>
+      <button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Masuk</button>
+    </div>
+  </form>
+</div>
+
+<div id="registerModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-center justify-center overflow-y-auto py-6">
+  <form id="registerForm" className="bg-white rounded-none md:rounded-2xl w-full max-w-3xl h-full max-h-[calc(100vh-2rem)] p-6 space-y-4 overflow-y-auto shadow-2xl">
+    <div className="flex items-center justify-between">
+      <h3 className="font-display font-bold text-lg">Daftar Akun Baru</h3>
+      <button type="button" id="registerClose" className="modal-close text-inksoft text-2xl leading-none">×</button>
+    </div>
+    <div className="grid gap-4">
+      <div>
+        <label className="text-sm font-medium text-inksoft">Nama</label>
+        <input id="register_name" type="text" required className="w-full mt-2 border border-line rounded-2xl h-12 px-4 text-sm" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-inksoft">Email</label>
+        <input id="register_email" type="email" required className="w-full mt-2 border border-line rounded-2xl h-12 px-4 text-sm" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-inksoft">Password</label>
+        <input id="register_password" type="password" required className="w-full mt-2 border border-line rounded-2xl h-12 px-4 text-sm" />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-inksoft">Konfirmasi Password</label>
+        <input id="register_password_confirmation" type="password" required className="w-full mt-2 border border-line rounded-2xl h-12 px-4 text-sm" />
+      </div>
+    </div>
+    <div className="text-sm text-inksoft">
+      <button type="button" id="registerSwitchLogin" className="font-medium text-teal-700 hover:underline">Sudah punya akun? Masuk</button>
+    </div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+      <button type="button" id="registerCancel" className="text-inksoft text-sm font-medium px-5 h-12 rounded-2xl border border-line">Batal</button>
+      <button type="submit" className="w-full sm:w-auto bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-2xl h-12 px-6">Daftar</button>
+    </div>
+  </form>
+</div>
+
+{/* ============ INCOME FORM MODAL ============ */}
+<div id="incomeModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
+  <form id="incomeForm" className="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
+    <div className="flex items-center justify-between">
+      <h3 className="font-display font-bold text-[15px]">Catat Pemasukan</h3>
+      <button type="button" className="modal-close text-inksoft text-xl leading-none">×</button>
+    </div>
+    <input type="hidden" id="inc_id" />
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Jenis Pemasukan</label>
+      <select id="inc_category" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
+        <option value="earned">Earned / Active Income</option>
+        <option value="passive">Passive Income</option>
+        <option value="portfolio">Portfolio / Investment Income</option>
+      </select>
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Kategori</label>
+      <input id="inc_sub" list="inc_sub_list" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="Pilih / ketik" />
+      <datalist id="inc_sub_list"></datalist>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-[12.5px] font-medium text-inksoft">Jumlah (Rp)</label>
+        <input id="inc_amount" type="number" min="0" step="1" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm font-mono" placeholder="0" />
+      </div>
+      <div>
+        <label className="text-[12.5px] font-medium text-inksoft">Tanggal</label>
+        <input id="inc_date" type="date" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+      </div>
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
+      <input id="inc_note" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Lampiran bukti (opsional)</label>
+      <input id="inc_attachment" type="file" accept="image/*,application/pdf" className="w-full mt-1" />
+    </div>
+    <div className="flex gap-2 pt-1">
+      <button type="button" id="inc_delete" className="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
+      <button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Simpan</button>
+    </div>
+  </form>
+</div>
+
+{/* ============ ALLOCATION FORM MODAL ============ */}
+<div id="allocationModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-40 items-end md:items-center justify-center overflow-y-auto py-6">
+  <form id="allocationForm" className="bg-white rounded-t-2xl md:rounded-2xl w-full md:w-[440px] p-5 space-y-3.5 max-h-[92vh] overflow-y-auto">
+    <div className="flex items-center justify-between">
+      <h3 className="font-display font-bold text-[15px]">Catat Dana Alokasi</h3>
+      <button type="button" className="modal-close text-inksoft text-xl leading-none">×</button>
+    </div>
+    <input type="hidden" id="alc_id" />
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Jenis Alokasi</label>
+      <select id="alc_category" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm bg-white">
+        <option value="darurat">Dana Darurat (Emergency Fund)</option>
+        <option value="asuransi">Asuransi (Insurance)</option>
+        <option value="investasi">Investasi</option>
+        <option value="cadangan">Dana Cadangan / Likuiditas Tambahan</option>
+      </select>
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Kategori</label>
+      <input id="alc_sub" list="alc_sub_list" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" placeholder="Pilih / ketik" />
+      <datalist id="alc_sub_list"></datalist>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-[12.5px] font-medium text-inksoft">Jumlah (Rp)</label>
+        <input id="alc_amount" type="number" min="0" step="1" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm font-mono" placeholder="0" />
+      </div>
+      <div>
+        <label className="text-[12.5px] font-medium text-inksoft">Tanggal</label>
+        <input id="alc_date" type="date" required className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+      </div>
+    </div>
+    <div>
+      <label className="text-[12.5px] font-medium text-inksoft">Catatan (opsional)</label>
+      <input id="alc_note" className="w-full mt-1 border border-line rounded-xl h-11 px-3 text-sm" />
+    </div>
+    <div className="flex gap-2 pt-1">
+      <button type="button" id="alc_delete" className="hidden text-rust-600 text-sm font-semibold px-4 h-11 rounded-xl border border-rust-200">Hapus</button>
+      <button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold rounded-xl h-11">Simpan</button>
+    </div>
+  </form>
+</div>
+
+{/* ============ CONFIRM DELETE ============ */}
+<div id="confirmModal" className="modal-backdrop fixed inset-0 bg-ink/40 z-50 items-center justify-center">
+  <div className="bg-white rounded-2xl w-[300px] p-5 text-center space-y-3">
+    <p className="text-sm text-ink">Hapus data ini? Tindakan tidak bisa dibatalkan.</p>
+    <div className="flex gap-2">
+      <button id="confirmCancel" className="flex-1 h-10 rounded-xl border border-line text-sm font-medium">Batal</button>
+      <button id="confirmOk" className="flex-1 h-10 rounded-xl bg-rust-600 text-white text-sm font-semibold">Hapus</button>
+    </div>
+  </div>
+</div>
+
+{/* toast */}
+<div id="toastWrap" className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 space-y-2"></div>
+
     </div>
   );
 }

@@ -92,6 +92,9 @@
       visibility: hidden;
     }
   }
+  main {
+    transition: opacity 0.15s ease;
+  }
 }
 
 /* Splash screen styles */
